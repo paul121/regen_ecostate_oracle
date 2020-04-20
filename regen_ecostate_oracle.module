@@ -72,9 +72,55 @@ function regen_ecostate_oracle_dashboard_page() {
   $output = array();
 
   $output['map'] = farm_map_build('ecostate-dashboard-map', FALSE);
-  $output['options'] = array(
-    '#markup' => "<h4>Select an area on the map to view associated ecodata contract details.</h4>",
+
+  $output['instructions'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Instructions',
   );
+
+  $output['instructions']['select'] = array(
+    '#markup' => '<h4>View Ecostate Contracts</h4>' .
+      '<p>Select an area on the map and click "Contract Details" to view the contract associated with an area.</p><br>',
+  );
+
+  $output['instructions']['update_ecostate'] = array(
+    '#markup' => '<h4>Update Ecostate</h4>' .
+      '<p>Select "Contract Details" from an above area. This page provides a form to update the ecostate value. After execution, the result will be saved in a farmOS Observation Log associated with the area.</p><br>',
+  );
+
+  $add_area_link = l('Add an area', 'admin/structure/taxonomy/farm_areas/add', array('query'=> array('destination' => 'farm/ecostate/instantiate/area')));
+  $instantiate_area_link = l('Instantiate area', 'farm/ecostate/instantiate/area');
+  $contract_requirements_link = l('contract requirements', 'https://github.com/regen-network/testnets/tree/master/kontraua/challenges/phase-5#payout-contract-requirements');
+
+  $output['instructions']['instantiate_contract'] = array(
+    '#markup' => '<h4>Instantiate Contract</h4>' .
+      '<p>farmOS Areas can only have one ecostate contract associated with them. Add an area to instantiate a new contract: ' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area)</li>' .
+      '<li>' . $instantiate_area_link .' - This module instantiates code #152 by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. You may supply a different code to test your custom contract.</li></ul></p><br>',
+  );
+
+  $code_link = l('code $152', 'https://regen.wasm.glass/codes/152');
+  $oracle_address = variable_get('regen_ecostate_oracle_address', '(not configred)');
+
+  $output['instructions']['link_contrat'] = array(
+    '#markup' => '<h4>Link Existing Contract</h4>' .
+      '<p>This module instantiates ' . $code_link . ' by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. In case this is not compatible with your contract, you can try linking an existing contract to test the "update_ecostate" functionality of your contract.' .
+      '<br><br><strong>NOTE:</strong> Your contract must be instantiated with the oracle set to the account used by this farmOS server: "'. $oracle_address .'"' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area)</li>' .
+      '<li>' . $instantiate_area_link .' - At the bottom, complete "Link Contract".</li></ul></p><br>',
+  );
+
+  $kontraua_testnet_link = l('Kontraua Testnet', 'https://github.com/regen-network/testnets');
+  $cosmwasm_js_link = l('cosmwasm-js', 'https://github.com/CosmWasm/cosmwasm-js');
+  $testnet_explorer_link = l('explorer', 'https://explorer.regen.vitwit.com');
+
+  $output['instructions']['links'] = array(
+    '#markup' => '<h4>More info:</h4>' .
+      '<ul><li>Info on the Regen Network '.$kontraua_testnet_link.'</li>'.
+      '<li>This module uses '.$cosmwasm_js_link.' to communicate with cosmwasm contracts on the testnet.</li>'.
+      '<li>Live testnet '.$testnet_explorer_link.'</li></ul>',
+  );
+
 
   return $output;
 }
