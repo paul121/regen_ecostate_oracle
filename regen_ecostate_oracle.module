@@ -1,0 +1,598 @@
+<?php
+
+/**
+ * @file
+ * Code for Regen Ecostate Oracle
+ */
+
+/*
+ * Implements hook_menu
+ */
+function regen_ecostate_oracle_menu() {
+
+  // Default dashboard page.
+  $items['farm/ecostate'] = array(
+    'title' => 'Ecostate',
+    'page callback' => 'regen_ecostate_oracle_dashboard_page',
+    'access arguments' => array('access farm dashboard'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 100,
+  );
+
+  // View area contract details.
+  $items['farm/ecostate/area/%'] = array(
+    'title' => 'Contract Details',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('regen_ecostate_oracle_contract_form', 3),
+    'access arguments' => array('access farm dashboard'),
+  );
+
+  // Select area to instantiate.
+  $items['farm/ecostate/instantiate/area'] = array(
+    'title' => 'Instantiate',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('regen_ecostate_oracle_instantiate_area_form'),
+    'access arguments' => array('access farm dashboard'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  // Instantiate new contract in area.
+  $items['farm/ecostate/instantiate/area/%'] = array(
+    'title' => 'Instantiate',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('regen_ecostate_oracle_instantiate_contract_form', 4),
+    'access arguments' => array('access farm dashboard'),
+  );
+
+  // Ecostate dashboard.
+  $items['farm/ecostate/dashboard'] = array(
+    'title' => 'Dashboard',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -100,
+  );
+
+  // Oracle configuration form.
+  $items['admin/config/farm/regen'] = array(
+    'title' => 'Regen Oracle',
+    'description' => 'Regen Network config settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('regen_ecostate_oracle_settings_form'),
+    'access arguments' => array('access farm dashboard'),
+  );
+
+  return $items;
+}
+
+/**
+ * Quick form page callback.
+ */
+function regen_ecostate_oracle_dashboard_page() {
+  drupal_set_title(t('Ecostate'));
+
+  $output = array();
+
+  $output['map'] = farm_map_build('ecostate-dashboard-map', FALSE);
+  $output['options'] = array(
+    '#markup' => "<h4>Select an area on the map to view associated ecodata contract details.</h4>",
+  );
+
+  return $output;
+}
+
+/*
+ * Implements hook_form()
+ */
+function regen_ecostate_oracle_contract_form($form, &$form_state, $area_id) {
+
+  // Load area.
+  $area = taxonomy_term_load($area_id);
+  $area_details = farm_area_get_details($area_id);
+
+  // Load area WKT.
+  $area_ids = array();
+  $area_ids[] = $area->tid;
+  $wkt = farm_area_extract_geoms($area_ids)[0];
+
+  // Save the area_id for form_submit.
+  $form['area_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $area_id,
+  );
+
+  // Display area info.
+  $form['area_details'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'farmOS Area Details',
+    '#collapsible' => TRUE
+  );
+
+  $form['area_details']['area_map'] = array(
+    '#type' => 'farm_map',
+    '#map_name' => 'ecostate-contract-map',
+    '#wkt' => $wkt,
+    '#edit' => FALSE,
+  );
+
+  $form['area_details']['details'] = array(
+    '#markup' => '<h3>Area Name:' . $area->name .'</h3><h5>Details:</h5><p>'.$area_details.'</p>'
+  );
+
+  // Load contract associated with area.
+  $contracts = variable_get('regen_ecostate_oracle_area_contracts', array());
+  $contract_address = null;
+  if (!empty($contracts[$area_id])) {
+    $contract = $contracts[$area_id];
+    $contract_address = $contract['address'];
+
+    $form['contract'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Contract',
+    );
+
+    $form['contract']['info'] = array(
+      '#markup' => '<h4>Contact Address: <a href="https://regen.wasm.glass/contracts/' . $contract['address'].'">' . $contract['address'] . '</a></h4>' .
+        '<div id="contract-label">Label: Loading...</div>' .
+        '<div id="contract-codeId">Code ID: Loading...</div>' .
+        '<div id="contract-creator">Creator: Loading...</div>' .
+        '<div id="contract-ecostate">Ecostate: Loading...</div>' .
+        '<div id="contract-initMsg">Ecostate: Loading...</div>' .
+        '<div id="contract-state">State: Loading...</div>',
+    );
+
+    $form['contract']['info']['#attached']['js'][] = array(
+      'type' => 'setting',
+      'data' => array('regen_ecostate_oracle' => array('contract' => $contract_address)),
+    );
+
+    // Build a query to find observation logs in an area.
+    $query = farm_quantity_log_query('ratio', 'ecostate', $done = TRUE, $type = 'farm_observation');
+    $query->addTag('regen_ecostate_oracle_log_query');
+    $query->join('field_data_field_farm_area', 'ss_fdffa', "ss_fdffa.entity_id = ss_log.id");
+    $query->where('ss_fdffa.field_farm_area_tid = ' . $area_id);
+
+    // Execute the query and gather the log ids.
+    $result = $query->execute();
+    $log_ids = array();
+    foreach ($result as $row) {
+      if (!empty($row->id)) {
+        $log_ids[] = $row->id;
+      }
+    }
+
+    // If there are log IDs, load the logs.
+    $logs = array();
+    if (!empty($log_ids)) {
+      $logs = log_load_multiple($log_ids);
+    }
+
+    // Display logs.
+    $form['log_fieldset'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Logs',
+    );
+
+    $form['log_fieldset']['logs'] = array();
+    foreach ($logs as $log) {
+
+      // Create a collapsible fieldset for this log.
+      $form['log_fieldset']['logs'][$log->id] = array(
+        '#type' => 'fieldset',
+        '#title' => $log->name,
+        '#collapsible' => TRUE,
+      );
+
+      // Load ecostate quantity data.
+      $ecostate = farm_quantity_log_data($log, 'ratio', 'ecostate');
+
+      $log_wrapper = entity_metadata_wrapper('log', $log);
+
+      $log_data = NULL;
+      if (!empty($log_wrapper->field_farm_data)) {
+        $log_data = json_decode($log_wrapper->field_farm_data->value());
+      }
+
+      $tx = isset($log_data->transaction) ? $log_data->transaction : '';
+      $response = isset($log_data->response) ? $log_data->response : '';
+
+      $tx_url = 'https://regen.wasm.glass/transactions/' . $tx;
+      $output = array(
+        '#markup' => '<p>Log ID: ' . $log->id .' </p>' .
+          '<p>Ecostate: ' . $ecostate[0]['value'] . ' %</p>' .
+          '<p>Transaction: ' . l($tx, $tx_url) . '</p>' .
+          '<p>Raw Response: </p><pre>' . json_encode($response) . '</pre>',
+      );
+
+      $form['log_fieldset']['logs'][$log->id]['info'] = $output;
+    }
+
+    // Create a new log.
+    $form['log_fieldset']['logs']['new_log'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Update Ecostate',
+      '#collapsible' => TRUE,
+    );
+
+    $form['log_fieldset']['logs']['new_log']['new_ecostate'] = array(
+      '#type' => 'textfield',
+      '#title' => 'Ecostate value',
+    );
+
+    $form['log_fieldset']['logs']['new_log']['new_transaction'] = array(
+      '#type' => 'hidden',
+      '#default_value' => '',
+    );
+
+    $form['log_fieldset']['logs']['new_log']['status'] = array(
+      '#type' => 'textfield',
+      '#title' => 'Status',
+      '#attributes' => array('readonly' => 'readonly'),
+    );
+
+    $form['log_fieldset']['logs']['new_log']['update_ecostate'] = array(
+      '#type' => 'button',
+      '#value' => 'Update Ecostate',
+      '#id' => 'update-ecostate',
+      '#attributes' => array('onclick' => 'return (false);'),
+    );
+
+    // Add behavior to update ecostate.
+    $form['log_fieldset']['logs']['new_log']['update_ecostate']['#attached']['js'] = array(
+      drupal_get_path('module', 'regen_ecostate_oracle') . '/js/update_ecostate.js',
+    );
+
+    $form['log_fieldset']['logs']['new_log']['submit'] = array(
+      '#type' => 'submit',
+      '#value' => 'Submit Log',
+      '#id' => 'submit-ecostate',
+      '#attributes' => array(
+        'class' => array('element-invisible'),
+      ),
+    );
+
+  }
+
+  $config = array(
+    'mnemonic' => variable_get('regen_ecostate_oracle_mnemonic', ''),
+    'oracle' => variable_get('regen_ecostate_oracle_address', ''),
+    'httpUrl' => variable_get('regen_ecostate_oracle_http_url', ''),
+    'networkId' => variable_get('regen_ecostate_oracle_network_id', ''),
+    'gasPrice' => variable_get('regen_ecostate_oracle_gas_price', ''),
+  );
+
+  drupal_add_js(array(
+    'regen_ecostate_oracle' => array(
+      'clientOpts' => $config,
+    ),
+  ), array('type' => 'setting'));
+
+  drupal_add_js(drupal_get_path('module', 'regen_ecostate_oracle') . '/cosmwasm/dist/main.js', array('weight'=> -100));
+  drupal_add_js(drupal_get_path('module', 'regen_ecostate_oracle') . '/js/load_contract.js', array('weight'=> -100));
+
+  return $form;
+}
+
+/*
+ * Implements hook_form_submit()
+ */
+function regen_ecostate_oracle_contract_form_submit($form, &$form_state) {
+  $area = taxonomy_term_load($form_state['values']['area_id']);
+
+  $ecostate = $form_state['values']['new_ecostate'];
+  $tx = $form_state['values']['new_transaction'];
+
+  regen_ecostate_oracle_create_ecostate_observation_log($area, $tx, $ecostate);
+}
+
+
+/*
+ * Implements hook_form()
+ */
+function regen_ecostate_oracle_instantiate_area_form($form, &$form_state) {
+  $areas = farm_area_load_areas();
+
+  $valid_areas = array();
+
+  $contracts = variable_get('regen_ecostate_oracle_area_contracts', array());
+  foreach($areas as $area) {
+    if (empty($contracts[$area->tid])) {
+      $valid_areas[$area->tid] = $area->name;
+    }
+  }
+
+  $form['area'] = array(
+    '#type' => 'select',
+    '#title' => 'Area',
+    '#options' => $valid_areas,
+    '#default_vale' => '',
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+  return $form;
+}
+
+/*
+ * Implements hook_form_submit()
+ */
+function regen_ecostate_oracle_instantiate_area_form_submit($form, &$form_state)  {
+  $form_state['redirect'] = '/farm/ecostate/instantiate/area/' . $form_state['values']['area'];
+}
+
+/*
+ * Implements hook_form()
+ */
+function regen_ecostate_oracle_instantiate_contract_form($form, &$form_state, $area_id) {
+
+  drupal_set_title('Regen Ecostate');
+
+  // Load area.
+  $area = taxonomy_term_load($area_id);
+  $area_details = farm_area_get_details($area_id);
+
+  // Load area WKT.
+  $area_ids = array();
+  $area_ids[] = $area->tid;
+  $wkt = farm_area_extract_geoms($area_ids)[0];
+
+  // Save area_id for form_submit.
+  $form['area_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $area_id,
+  );
+
+  // Display area details.
+  $form['area_details'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'farmOS Area Details',
+    '#collapsible' => TRUE
+  );
+
+  $form['area_details']['area_map'] = array(
+    '#type' => 'farm_map',
+    '#map_name' => 'ecostate-contract-map',
+    '#wkt' => $wkt,
+    '#edit' => FALSE,
+  );
+
+  $form['area_details']['details'] = array(
+    '#markup' => '<h3>Area Name:' . $area->name .'</h3><h5>Details:</h5><p>'.$area_details.'</p>'
+  );
+
+  // Instantiate contract.
+  $form['instantiate_contract'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Instantiate New Contract',
+  );
+
+  $form['instantiate_contract']['instantiate_code_id'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Code ID',
+    '#default_value' => '143',
+  );
+
+  $form['instantiate_contract']['instantiate_beneficiary'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Beneficiary',
+  );
+
+  $form['instantiate_contract']['instantiate_total_tokens'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Total Tokens',
+  );
+
+  $form['instantiate_contract']['instantiate_ecostate'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Initial Ecostate',
+  );
+
+  $form['instantiate_contract']['instantiate_region'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Region',
+    '#default_value' => $area->name,
+    '#attributes' => array('readonly' => 'readonly'),
+  );
+
+  $form['instantiate_contract']['instantiate_label'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Contract Label',
+    '#default_value' => 'farmOS: ' . $area->name,
+    '#attributes' => array('readonly' => 'readonly'),
+  );
+
+  $form['instantiate_contract']['instantiate_address'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+  );
+
+  $form['instantiate_contract']['instantiate_tx'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+  );
+
+  $form['instantiate_contract']['instantiate_status'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Status',
+    '#default_value' => '',
+    '#attributes' => array('readonly' => 'readonly'),
+  );
+
+  $form['instantiate_contract']['instantiate_contract'] = array(
+    '#type' => 'button',
+    '#value' => 'Instantiate Contract',
+    '#id' => 'instantiate-contract',
+    '#attributes' => array('onclick' => 'return (false);'),
+  );
+
+  $form['instantiate_contract']['submit_contract'] = array(
+    '#type' => 'submit',
+    '#value' => 'submit contract',
+    '#id' => 'submit-contract',
+    '#attributes' => array(
+      'class' => array('element-invisible'),
+    ),
+  );
+
+  // Add option to link area to existing contract.
+  $form['link_contract'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Link Existing Contract',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $form['link_contract']['link_contract_address'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Contract Address',
+    '#id' => 'link-contract-address',
+  );
+
+  $form['link_contract']['link_contract_submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Link contract',
+    '#submit' => array('regen_ecostate_oracle_instantiate_contract_link_form_submit'),
+  );
+
+  $config = array(
+    'mnemonic' => variable_get('regen_ecostate_oracle_mnemonic', ''),
+    'oracle' => variable_get('regen_ecostate_oracle_address', ''),
+    'httpUrl' => variable_get('regen_ecostate_oracle_http_url', ''),
+    'networkId' => variable_get('regen_ecostate_oracle_network_id', ''),
+    'gasPrice' => variable_get('regen_ecostate_oracle_gas_price', ''),
+  );
+
+  drupal_add_js(array(
+    'regen_ecostate_oracle' => array(
+      'clientOpts' => $config,
+    ),
+  ), array('type' => 'setting'));
+
+  drupal_add_js(drupal_get_path('module', 'regen_ecostate_oracle') . '/cosmwasm/dist/main.js', array('weight' => -100));
+  drupal_add_js(drupal_get_path('module', 'regen_ecostate_oracle') . '/js/instantiate_contract.js', array('weight'=> -100));
+  return $form;
+}
+
+/*
+ * Implements hook_form_submit().
+ */
+function regen_ecostate_oracle_instantiate_contract_form_submit($form, &$form_state) {
+  $area_id = $form_state['values']['area_id'];
+  $area = taxonomy_term_load($area_id);
+
+  $address = $form_state['values']['instantiate_address'];
+
+  $contracts = variable_get('regen_ecostate_oracle_area_contracts', array());
+  $contracts[$area_id] = array('address'=> $address);
+  variable_set('regen_ecostate_oracle_area_contracts', $contracts);
+
+  $tx = $form_state['values']['instantiate_tx'];
+  $ecostate = $form_state['values']['instantiate_ecostate'];
+
+  regen_ecostate_oracle_create_ecostate_observation_log($area, $tx, $ecostate);
+
+  $form_state['redirect'] = '/farm/ecostate/area/' . $area_id;
+}
+
+/*
+ * Implements hook_form_submit().
+ */
+function regen_ecostate_oracle_instantiate_contract_link_form_submit($form, &$form_state) {
+  $area_id = $form_state['values']['area_id'];
+  $address = $form_state['values']['link_contract_address'];
+
+  $contracts = variable_get('regen_ecostate_oracle_area_contracts', array());
+  $contracts[$area_id] = array('address'=> $address);
+  variable_set('regen_ecostate_oracle_area_contracts', $contracts);
+
+  $form_state['redirect'] = '/farm/ecostate/area/' . $area_id;
+}
+
+
+/*
+ * Helper function to create ecostate observation logs.
+ */
+function regen_ecostate_oracle_create_ecostate_observation_log($area, $tx, $ecostate) {
+  $ecostate_percent = substr($ecostate, 0, strlen($ecostate) - 2) . '.' . substr($ecostate, -2);
+  $measurements = array();
+  $measurements[] = array(
+    'measure' => 'ratio',
+    'value' => $ecostate_percent,
+    'units' => '%',
+    'label' => 'ecostate',
+  );
+
+  // Set log name.
+  $log_name = t('Update ' . $area->name . ' ecostate to ' . $ecostate_percent . '%');
+
+  // Create a new farm quantity log.
+  $log = farm_quantity_log_create('farm_observation', $log_name, REQUEST_TIME, TRUE, array(), $measurements);
+
+  // Get the log entity wrapper.
+  $log_wrapper = entity_metadata_wrapper('log', $log);
+
+  // Add the area reference.
+  $log_wrapper->field_farm_area[] = $area;
+
+  $log_wrapper->field_farm_notes->value->set('<a href="https://regen.wasm.glass/transactions/' . $tx . '">' . $tx . '</a>');
+  $log_wrapper->field_farm_notes->format->set('farm_format');
+
+  $tx_data = json_decode($tx);
+
+  $log_wrapper->field_farm_data->set(json_encode(array('response'=>$tx, 'transaction'=>$tx_data->transactionHash)));
+  //$log_wrapper->field_farm_data->format->set('json');
+
+  // Save the log (via its wrapper).
+  $log_wrapper->save();
+
+  return $log;
+}
+
+/*
+ * Implements hook_form()
+ *
+ * Settings for the regen oracle.
+ */
+function regen_ecostate_oracle_settings_form($form, &$form_state) {
+
+  $form['regen_ecostate_oracle_http_url'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Chain URL',
+    '#description' => 'Blockchain URL',
+    '#default_value' => variable_get('regen_ecostate_oracle_http_url', ''),
+  );
+
+  $form['regen_ecostate_oracle_network_id'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Chain ID',
+    '#description' => 'Chain ID',
+    '#default_value' => variable_get('regen_ecostate_oracle_network_id', ''),
+  );
+
+  $form['regen_ecostate_oracle_gas_price'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Gas Price',
+    '#description' => 'Gas Price',
+    '#default_value' => variable_get('regen_ecostate_oracle_gas_price', ''),
+  );
+
+  $form['regen_ecostate_oracle_address'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Oracle Address',
+    '#description' => 'Public key of Oracle account',
+    '#default_value' => variable_get('regen_ecostate_oracle_address', ''),
+    '#maxlength' => 255,
+  );
+
+  $form['regen_ecostate_oracle_mnemonic'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Oracle mnemonic',
+    '#description' => 'Used to generate the private key of oracle to sign txs',
+    '#default_value' => variable_get('regen_ecostate_oracle_mnemonic', ''),
+    '#maxlength' => 255,
+  );
+
+  return system_settings_form($form);
+}

@@ -1,0 +1,4 @@
+name = Regen Ecostate Oracle
+description = Oracle for the Ecostate contract
+core = 7.x
+package = farmOS Contrib
