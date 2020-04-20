@@ -1,0 +1,19 @@
+{
+  "name": "farmos-cosmwasm",
+  "version": "1.0.0",
+  "description": "Use cosmwasm.js in farmOS",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --config webpack.config.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cosmwasm/sdk": "^0.7.7"
+  },
+  "devDependencies": {
+    "webpack": "^4.42.1",
+    "webpack-cli": "^3.3.11"
+  }
+}
