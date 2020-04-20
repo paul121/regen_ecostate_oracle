@@ -599,6 +599,38 @@ function regen_ecostate_oracle_create_ecostate_observation_log($area, $tx, $ecos
 }
 
 /*
+ * Helper function to get current ecostate value from in an area.
+ */
+function regen_ecostate_oracle_get_current_ecostate($area_id) {
+
+  // Build a query to find a log that references an asset.
+  $query = farm_quantity_log_query('ratio', 'ecostate', $done = TRUE, $type = 'farm_observation');
+  // Add a query tag to identify where this came from.
+  $query->addTag('regen_ecostate_oracle_log_query');
+  $query->join('field_data_field_farm_area', 'ss_fdffa', "ss_fdffa.entity_id = ss_log.id");
+  $query->where('ss_fdffa.field_farm_area_tid = ' . $area_id);
+  $query->range(0,1);
+
+  // Execute the query and gather the log ids.
+  $result = $query->execute();
+  $log_ids = array();
+  foreach ($result as $row) {
+    if (!empty($row->id)) {
+      $log_ids[] = $row->id;
+    }
+  }
+
+  $ecostate = 'Not set.';
+  if (!empty($log_ids)) {
+    $log = log_load($log_ids[0]);
+
+    $ecostate = farm_quantity_log_data($log, 'ratio', 'ecostate')[0]['value'];
+  }
+
+  return $ecostate;
+}
+
+/*
  * Implements hook_form()
  *
  * Settings for the regen oracle.
