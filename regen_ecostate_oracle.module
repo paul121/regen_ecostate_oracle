@@ -73,6 +73,38 @@ function regen_ecostate_oracle_dashboard_page() {
 
   $output['map'] = farm_map_build('ecostate-dashboard-map', FALSE);
 
+  $areas = farm_area_load_areas();
+
+  $valid_areas = array();
+
+  $contracts = variable_get('regen_ecostate_oracle_area_contracts', array());
+  foreach($areas as $area) {
+    if (!empty($contracts[$area->tid])) {
+      $valid_areas[] = $area;
+    }
+  }
+
+  $output['contracts'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Contracts',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE
+  );
+
+  $contract_markup = '';
+
+  foreach($valid_areas as $area) {
+    $area_contract_link = l($area->name, 'farm/ecostate/area/'. $area->tid);
+    $ecostate = regen_ecostate_oracle_get_current_ecostate($area->tid);
+    $contract_markup = $contract_markup . '<li>'. $area_contract_link .' -  Current ecostate: <strong>' . $ecostate. '%</strong></li>';
+  }
+
+  $output['contracts']['created_contracts'] = array(
+    '#markup' => $contract_markup,
+    '#prefix' => '<ul>',
+    '#suffix' => '</ul>'
+  );
+
   $output['instructions'] = array(
     '#type' => 'fieldset',
     '#title' => 'Instructions',
@@ -80,7 +112,7 @@ function regen_ecostate_oracle_dashboard_page() {
 
   $output['instructions']['select'] = array(
     '#markup' => '<h4>View Ecostate Contracts</h4>' .
-      '<p>Select an area on the map and click "Contract Details" to view the contract associated with an area.</p><br>',
+      '<p>Select an area on the map and click "Contract Details" to view the contract associated with an area OR choose from the list of areas above.</p><br>',
   );
 
   $output['instructions']['update_ecostate'] = array(
