@@ -15,7 +15,7 @@
             $('input[name=instantiate_status]').val("Loading...");
 
             const opts = {
-              oracle: 'xrn:1k70df4949vmhmx96ckj8r92lkmv6zv4m9aqn3s',
+              oracle: clientOpts.oracle,
               codeId: +$('input[name=instantiate_code_id]').val(),
               beneficiary: $('input[name=instantiate_beneficiary]').val(),
               totalTokens: +$('input[name=instantiate_total_tokens]').val(),
