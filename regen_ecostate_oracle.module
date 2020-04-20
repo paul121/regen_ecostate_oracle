@@ -127,18 +127,18 @@ function regen_ecostate_oracle_dashboard_page() {
   $output['instructions']['instantiate_contract'] = array(
     '#markup' => '<h4>Instantiate Contract</h4>' .
       '<p>farmOS Areas can only have one ecostate contract associated with them. Add an area to instantiate a new contract: ' .
-      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area)</li>' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
       '<li>' . $instantiate_area_link .' - This module instantiates code #152 by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. You may supply a different code to test your custom contract.</li></ul></p><br>',
   );
 
-  $code_link = l('code $152', 'https://regen.wasm.glass/codes/152');
+  $code_link = l('code #152', 'https://regen.wasm.glass/codes/152');
   $oracle_address = variable_get('regen_ecostate_oracle_address', '(not configred)');
 
   $output['instructions']['link_contrat'] = array(
     '#markup' => '<h4>Link Existing Contract</h4>' .
       '<p>This module instantiates ' . $code_link . ' by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. In case this is not compatible with your contract, you can try linking an existing contract to test the "update_ecostate" functionality of your contract.' .
       '<br><br><strong>NOTE:</strong> Your contract must be instantiated with the oracle set to the account used by this farmOS server: "'. $oracle_address .'"' .
-      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area)</li>' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
       '<li>' . $instantiate_area_link .' - At the bottom, complete "Link Contract".</li></ul></p><br>',
   );
 
