@@ -261,6 +261,7 @@ function regen_ecostate_oracle_contract_form($form, &$form_state, $area_id) {
     $form['log_fieldset']['logs']['new_log']['new_ecostate'] = array(
       '#type' => 'textfield',
       '#title' => 'Ecostate value',
+      '#description' => 'A positive integer, which maintains the percentage of forest cover, without decimals. 56.16% is stored as 5616'
     );
 
     $form['log_fieldset']['logs']['new_log']['new_transaction'] = array(
@@ -433,6 +434,7 @@ function regen_ecostate_oracle_instantiate_contract_form($form, &$form_state, $a
   $form['instantiate_contract']['instantiate_ecostate'] = array(
     '#type' => 'textfield',
     '#title' => 'Initial Ecostate',
+    '#description' => 'A positive integer, which maintains the percentage of forest cover, without decimals. 56.16% is stored as 5616'
   );
 
   $form['instantiate_contract']['instantiate_region'] = array(
