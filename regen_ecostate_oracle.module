@@ -29,7 +29,7 @@ function regen_ecostate_oracle_menu() {
 
   // Select area to instantiate.
   $items['farm/ecostate/instantiate/area'] = array(
-    'title' => 'Instantiate',
+    'title' => 'Link/Instantiate',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('regen_ecostate_oracle_instantiate_area_form'),
     'access arguments' => array('access farm dashboard'),
@@ -111,36 +111,43 @@ function regen_ecostate_oracle_dashboard_page() {
   );
 
   $output['instructions']['select'] = array(
-    '#markup' => '<h4>View Ecostate Contracts</h4>' .
-      '<p>Select an area on the map and click "Contract Details" to view the contract associated with an area OR choose from the list of areas above.</p><br>',
-  );
-
-  $output['instructions']['update_ecostate'] = array(
-    '#markup' => '<h4>Update Ecostate</h4>' .
-      '<p>Select "Contract Details" from an above area. This page provides a form to update the ecostate value. After execution, the result will be saved in a farmOS Observation Log associated with the area.</p><br>',
-  );
-
-  $add_area_link = l('Add an area', 'admin/structure/taxonomy/farm_areas/add', array('query'=> array('destination' => 'farm/ecostate/instantiate/area')));
-  $instantiate_area_link = l('Instantiate area', 'farm/ecostate/instantiate/area');
-  $contract_requirements_link = l('contract requirements', 'https://github.com/regen-network/testnets/tree/master/kontraua/challenges/phase-5#payout-contract-requirements');
-
-  $output['instructions']['instantiate_contract'] = array(
-    '#markup' => '<h4>Instantiate Contract</h4>' .
-      '<p>farmOS Areas can only have one ecostate contract associated with them. Add an area to instantiate a new contract: ' .
-      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
-      '<li>' . $instantiate_area_link .' - This module instantiates code #152 by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. You may supply a different code to test your custom contract.</li></ul></p><br>',
+    '#markup' => '<h3>View Ecostate Contracts</h3>' .
+      '<h5>Select an area on the map and click "Contract Details" OR choose an area from the list above to view the contract associated with that area</h5><br>',
   );
 
   $code_link = l('code #152', 'https://regen.wasm.glass/codes/152');
   $oracle_address = variable_get('regen_ecostate_oracle_address', '(not configred)');
+  $contract_requirements_link = l('contract requirements', 'https://github.com/regen-network/testnets/tree/master/kontraua/challenges/phase-5#payout-contract-requirements');
+  $add_area_link = l('Add an area', 'admin/structure/taxonomy/farm_areas/add', array('query'=> array('destination' => 'farm/ecostate/instantiate/area')));
+  $instantiate_area_link = l('Instantiate area', 'farm/ecostate/instantiate/area');
 
-  $output['instructions']['link_contrat'] = array(
-    '#markup' => '<h4>Link Existing Contract</h4>' .
-      '<p>This module instantiates ' . $code_link . ' by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. In case this is not compatible with your contract, you can try linking an existing contract to test the "update_ecostate" functionality of your contract.' .
-      '<br><br><strong>NOTE:</strong> Your contract must be instantiated with the oracle set to the account used by this farmOS server: "'. $oracle_address .'"' .
-      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
-      '<li>' . $instantiate_area_link .' - At the bottom, complete "Link Contract".</li></ul></p><br>',
+  $output['instructions']['validator_steps'] = array(
+    '#markup' => '<h3>Validator Steps</h3><br>'
   );
+
+  $output['instructions']['link_contract'] = array(
+    '#markup' => '<h4>1. Link Existing Contract</h4>' .
+      '<p>Link a custom contract to an area and execute the "update_ecostate" message from the farmOS oracle. This simulates how a 3rd party might make ecostate claims against your contract.</p>' .
+      '<strong>NOTE: Your contract must be instantiated with the oracle set to the account used by this farmOS server: "'. $oracle_address .'" or else attempts to execute messages on the contract will be denied.</strong>' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
+      '<li>' . $instantiate_area_link .' - Complete the "Link Contract" part of the form.</li></ul></p><br>',
+  );
+
+  $output['instructions']['update_ecostate'] = array(
+    '#markup' => '<h4>2. Update Ecostate</h4>' .
+      '<p><ul><li>Select "Contract Details" from an above area.</li>' .
+      '<li>This page provides a form to update the ecostate value. After execution, the result will be saved in a farmOS Observation Log associated with the area.</li>' .
+      '<li>This can be repeated until all tokens are released from a contract (or other criteria is met).</li></ul><br>',
+  );
+
+  $init_msg_schema = l('initMsg Schema', 'https://github.com/regen-network/ecodata-payout/blob/master/schema/init_msg.json');
+  $output['instructions']['instantiate_contract'] = array(
+    '#markup' => '<h4>Optional: Instantiate Contract</h4>' .
+      '<p>This module instantiates ' . $code_link . ' by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. You may also supply your custom "codeID" <strong>BUT your contract must be compatible with this ' . $init_msg_schema . '</strong>' .
+      '<ul><li>' . $add_area_link . ' (Create a farmOS "Field" area. Please keep areas clustered in the same region so they remain visible on the map.)</li>' .
+      '<li>' . $instantiate_area_link .' - This module instantiates code #152 by default. This contract implements a subset of features defined in the ' .$contract_requirements_link.'. You may supply a different code to test your custom contract.</li></ul></p><br>',
+  );
+
 
   $kontraua_testnet_link = l('Kontraua Testnet', 'https://github.com/regen-network/testnets');
   $cosmwasm_js_link = l('cosmwasm-js', 'https://github.com/CosmWasm/cosmwasm-js');
