@@ -452,6 +452,8 @@ function regen_ecostate_oracle_instantiate_contract_form($form, &$form_state, $a
   $form['instantiate_contract'] = array(
     '#type' => 'fieldset',
     '#title' => 'Instantiate New Contract',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
   );
 
   $form['instantiate_contract']['instantiate_code_id'] = array(
